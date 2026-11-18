@@ -194,21 +194,22 @@ function start(meCanvas) {
   // 쌓는 순서: 100장(+승인된 것)은 뒤섞고, 내 신바닥은 60% 지점에 끼워 위로 몇 줄 더 덮이게
   const order = soles.slice().sort(() => Math.random() - .5);
   order.splice(Math.floor(order.length*.6), 0, me);
-  const cols = 8, rows = Math.ceil(order.length / cols), cw = W / cols;
-  const step = Math.min(cw*.9, (H*.5) / rows), hh = Math.min(step/.45, cw*2.2);   // 줄 간격, 쌓일 때 높이
+  // 신바닥을 눕혀 한 줄에 5장씩, 줄마다 반 칸 엇갈리고 앞꿈치 방향을 바꿔 벽돌처럼 쌓음
+  const cols = 5, rows = Math.ceil(order.length / cols), cw = W / (cols + .5);
+  const L = cw*.96, step = Math.min(L*.4, (H*.62) / rows);          // 누운 신바닥 길이, 줄 간격
   order.forEach((o, n) => {
-    const r = Math.floor(n / cols), c = r % 2 ? cols - 1 - n % cols : n % cols;      // 지그재그로 한 줄씩
-    o.sx = cw*(c + .5) + (Math.random() - .5)*cw*.25;
-    o.sy = H - 26 - hh/2 - r*step;
-    o.sa = (Math.random() - .5)*.12;
-    o.ss = hh / o.ph;                                   // 모두 같은 높이로
+    const r = Math.floor(n / cols), c = n % cols;
+    o.sx = cw*(c + .5 + (r % 2 ? .5 : 0)) + (Math.random() - .5)*cw*.06;
+    o.sy = H - 30 - L*.22 - r*step;
+    o.sa = (r % 2 ? -1 : 1)*Math.PI/2 + (Math.random() - .5)*.06;
+    o.ss = L / o.ph;                                    // 모두 같은 길이로
     o.t0 = POUR + n*GAP;
   });
   const SORT = POUR + order.length*GAP + FALL + 700, meGo = SORT + (NS - 1)*STAG + MOVE - 300, END = meGo + ME_DUR;
 
   function fallY(o, t) {          // 위에서 떨어져 제자리에 닿고 살짝 튐
     const u = (t - o.t0) / FALL;
-    if (u < 1) return lerp(-o.ph*o.ss, o.sy, u*u);
+    if (u < 1) return lerp(-o.pw*o.ss - 20, o.sy, u*u);
     const b = Math.min(1, (t - o.t0 - FALL) / 160); return o.sy - Math.sin(Math.PI*b)*5*(1 - b);
   }
   function render(t) {
