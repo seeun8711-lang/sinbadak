@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>신바닥</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+:root{--bg:#F7F7F7;--btn:#111;--btnfg:#fff}
+body.dark{--bg:#141414;--btn:#F2F2F2;--btnfg:#111}
+#cv{position:fixed;left:0;top:0;touch-action:none}
+#cam{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));width:68px;height:68px;margin-left:-34px;border-radius:50%;border:0;background:var(--btn);display:flex;align-items:center;justify-content:center;transition:opacity .4s,transform .2s}
+#cam:active{transform:scale(.92)}
+#cam.hide{opacity:0;pointer-events:none}
+#cam svg{width:30px;height:30px;stroke:var(--btnfg);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#file{display:none}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<button id="cam" aria-label="내 신바닥 찍어 올리기"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13.2" r="3.6"/></svg></button>
+<input id="file" type="file" accept="image/*" capture="environment">
+<script src="matter.min.js"></script>
+<script>
+const Q = new URLSearchParams(location.search);
+if (Q.has('dark')) document.body.classList.add('dark');
+const DARK = Q.has('dark');
+const {Engine, Bodies, Composite, Body} = Matter;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d'),
+      cam = document.getElementById('cam'), file = document.getElementById('file');
+const D = [{"no":1,"w":149,"h":360},{"no":2,"w":147,"h":360},{"no":3,"w":211,"h":360},{"no":4,"w":157,"h":360},{"no":5,"w":174,"h":360},{"no":6,"w":148,"h":360},{"no":7,"w":143,"h":360},{"no":8,"w":183,"h":360},{"no":9,"w":140,"h":360},{"no":10,"w":163,"h":360},{"no":11,"w":144,"h":360},{"no":12,"w":161,"h":360},{"no":13,"w":143,"h":360},{"no":14,"w":174,"h":360},{"no":15,"w":140,"h":360},{"no":16,"w":135,"h":360},{"no":17,"w":144,"h":360},{"no":18,"w":148,"h":360},{"no":19,"w":123,"h":360},{"no":20,"w":136,"h":360},{"no":21,"w":159,"h":360},{"no":22,"w":145,"h":360},{"no":23,"w":161,"h":360},{"no":24,"w":137,"h":360},{"no":25,"w":122,"h":359},{"no":26,"w":136,"h":360},{"no":27,"w":219,"h":360},{"no":28,"w":144,"h":360},{"no":29,"w":134,"h":360},{"no":30,"w":140,"h":360},{"no":31,"w":176,"h":360},{"no":32,"w":160,"h":360},{"no":33,"w":155,"h":360},{"no":34,"w":161,"h":360},{"no":35,"w":141,"h":360},{"no":36,"w":167,"h":359},{"no":37,"w":138,"h":360},{"no":38,"w":169,"h":360},{"no":39,"w":178,"h":360},{"no":40,"w":117,"h":360},{"no":41,"w":123,"h":360},{"no":42,"w":200,"h":360},{"no":43,"w":165,"h":360},{"no":44,"w":147,"h":360},{"no":45,"w":148,"h":359},{"no":46,"w":158,"h":360},{"no":47,"w":144,"h":360},{"no":48,"w":140,"h":360},{"no":49,"w":147,"h":360},{"no":50,"w":156,"h":360},{"no":51,"w":126,"h":360},{"no":52,"w":141,"h":360},{"no":53,"w":156,"h":360},{"no":54,"w":132,"h":360},{"no":55,"w":159,"h":360},{"no":56,"w":163,"h":360},{"no":57,"w":131,"h":360},{"no":58,"w":127,"h":360},{"no":59,"w":151,"h":360},{"no":60,"w":170,"h":360},{"no":61,"w":146,"h":360},{"no":62,"w":190,"h":360},{"no":63,"w":150,"h":360},{"no":64,"w":122,"h":360},{"no":65,"w":136,"h":360},{"no":66,"w":180,"h":360},{"no":67,"w":145,"h":360},{"no":68,"w":141,"h":360},{"no":69,"w":165,"h":360},{"no":70,"w":127,"h":360},{"no":71,"w":137,"h":360},{"no":72,"w":139,"h":360},{"no":73,"w":128,"h":360},{"no":74,"w":136,"h":359},{"no":75,"w":129,"h":360},{"no":76,"w":134,"h":360},{"no":77,"w":127,"h":360},{"no":78,"w":142,"h":360},{"no":79,"w":155,"h":360},{"no":80,"w":156,"h":360},{"no":81,"w":131,"h":360},{"no":82,"w":132,"h":360},{"no":83,"w":211,"h":360},{"no":84,"w":135,"h":360},{"no":85,"w":164,"h":360},{"no":86,"w":127,"h":360},{"no":87,"w":128,"h":360},{"no":88,"w":173,"h":360},{"no":89,"w":138,"h":360},{"no":90,"w":167,"h":360},{"no":91,"w":173,"h":360},{"no":92,"w":181,"h":360},{"no":93,"w":124,"h":360},{"no":94,"w":126,"h":360},{"no":95,"w":128,"h":360},{"no":96,"w":160,"h":360},{"no":97,"w":127,"h":360},{"no":98,"w":141,"h":360},{"no":99,"w":135,"h":360},{"no":100,"w":139,"h":360}];  // 신바닥 100장 크기 (닳은 순서)
+let W, H, DPR, K, soles = [], grid, busy = false, me = null;
+
+// 시간표 (ms). 내 신바닥이 늦게 준비되면 뒤 시간들이 그만큼 밀린다
+const LIFT = 450,                 // 격자에서 위로 빠져나감
+      POUR = 500, GAP = 22,       // 위에서 한 장씩 쏟아짐
+      ME_AT = POUR + 60*GAP,      // 내 신바닥은 60번째쯤 섞여 떨어져 나머지 40장에 묻힘
+      SORT_MIN = POUR + 100*GAP + 900,
+      STAG = 14, MOVE = 900, ME_DUR = 1100, WAIT_MAX = 25000, DT = 1000/60;
+
+const ease = u => 1 - Math.pow(1 - Math.min(1, Math.max(0, u)), 3);
+const easeIn = u => Math.pow(Math.min(1, Math.max(0, u)), 2);
+const lerp = (a, b, u) => a + (b - a)*u;
+const norm = a => { a %= Math.PI*2; if (a > Math.PI) a -= Math.PI*2; if (a < -Math.PI) a += Math.PI*2; return a; };
+
+// 화면 크기와 10열 격자 (100장 + 101번째 칸)
+function resize() {
+  W = Q.has('phone') ? 390 : innerWidth; H = Q.has('phone') ? 844 : innerHeight;
+  DPR = Math.min(2, devicePixelRatio || 1);
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  const pad = 18, cols = 10, cell = (W - pad*2) / cols, rows = 11;
+  const top = Math.max(pad, (H - 120 - cell*rows) / 2);
+  grid = i => ({x: pad + (i % cols + .5)*cell, y: top + (Math.floor(i / cols) + .5)*cell, c: cell});
+  // 쌓일 때 크기: 100장 넓이 합이 화면의 약 55%
+  const area = D.reduce((s, d) => s + d.w*d.h, 0); K = Math.sqrt(W*H*.55 / area);
+  soles.forEach(o => size(o, o.d.w, o.d.h, o.i));
+  if (me) size(me, me.img.width, me.img.height, 100);
+}
+function size(o, w, h, i) { o.pw = w*K; o.ph = h*K; o.f = grid(i).c*.9 / Math.max(o.pw, o.ph); }
+
+// 그리기: 한 장의 캔버스에 전부
+function clear() { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); }
+function draw(o, x, y, a, sc) {
+  const c = Math.cos(a)*sc*DPR, s = Math.sin(a)*sc*DPR;
+  ctx.setTransform(c, s, -s, c, x*DPR, y*DPR);
+  ctx.drawImage(o.img, -o.pw/2, -o.ph/2, o.pw, o.ph);
+}
+function drawSlot() {
+  const g = grid(100), w = g.c*.84, h = g.c*.9;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.strokeStyle = DARK ? '#555' : '#BDBDBD'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.rect(g.x - w/2, g.y - h/2, w, h); ctx.stroke(); ctx.setLineDash([]);
+}
+function drawGrid() {
+  clear();
+  soles.forEach(o => { const g = grid(o.i); draw(o, g.x, g.y, 0, o.f); });
+  const g = grid(100);
+  if (me && me.done) draw(me, g.x, g.y, 0, me.f); else drawSlot();
+}
+
+// ---- 내 사진 → 누끼 → 앞꿈치 위로 세우기 ----
+const BG_CFG = {model: 'isnet_quint8', output: {format: 'image/png'}};
+let bgMod = null;
+function loadBG() {   // 누끼 도구(약 40MB)는 카메라 버튼을 누를 때부터 미리 받기 시작
+  if (!bgMod) bgMod = import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm')
+    .then(m => { m.preload(BG_CFG).catch(() => {}); return m; });
+  return bgMod;
+}
+function canvasOf(w, h) { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
+function shrink(img, max) {   // 휴대폰 원본(수천 px)을 한 번만 줄여 둠 → 버벅임 원인 제거
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, r = Math.min(1, max / Math.max(iw, ih));
+  const c = canvasOf(iw*r, ih*r); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c;
+}
+function fit360(c) { const r = 360 / Math.max(c.width, c.height), o = canvasOf(c.width*r, c.height*r); o.getContext('2d').drawImage(c, 0, 0, o.width, o.height); return o; }
+function ellipseCut(photo) {   // 누끼가 안 될 때: 신바닥 모양 타원으로 자름
+  const w = 190, h = 360, c = canvasOf(w, h), x = c.getContext('2d');
+  x.beginPath(); x.ellipse(w/2, h/2, w/2, h/2, 0, 0, Math.PI*2); x.clip();
+  const r = Math.max(w/photo.width, h/photo.height);
+  x.drawImage(photo, (w - photo.width*r)/2, (h - photo.height*r)/2, photo.width*r, photo.height*r); return c;
+}
+function alphaBox(c) {
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1, n = 0;
+  for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y*c.width + x)*4 + 3] > 128) {
+    n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  return {x0, y0, x1, y1, n, d};
+}
+function orientCut(cut) {
+  // 긴 축을 세로로, 넓은 쪽(앞꿈치)을 위로. 신바닥 100장과 같은 규칙
+  const w = cut.width, h = cut.height, d = cut.getContext('2d').getImageData(0, 0, w, h).data;
+  let n = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
+  for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 2) if (d[(y*w + x)*4 + 3] > 128) { n++; sx += x; sy += y; sxx += x*x; syy += y*y; sxy += x*y; }
+  if (n < w*h/4*.02) return null;                       // 거의 아무것도 못 땄으면 실패
+  const mx = sx/n, my = sy/n, cxx = sxx/n - mx*mx, cyy = syy/n - my*my, cxy = sxy/n - mx*my;
+  const th = .5*Math.atan2(2*cxy, cxx - cyy);           // 긴 축 각도
+  const L = Math.ceil(Math.hypot(w, h)), big = canvasOf(L, L), bx = big.getContext('2d');
+  bx.translate(L/2, L/2); bx.rotate(Math.PI/2 - th); bx.drawImage(cut, -mx, -my);
+  const b = alphaBox(big); if (b.x1 < 0) return null;
+  const bw = b.x1 - b.x0 + 1, bh = b.y1 - b.y0 + 1;
+  // 위 1/3과 아래 1/3 너비 비교 → 아래가 넓으면 뒤집기
+  const rowW = (ya, yb) => { let s = 0; for (let y = ya; y < yb; y++) for (let x = b.x0; x <= b.x1; x++) if (b.d[(y*L + x)*4 + 3] > 128) s++; return s; };
+  const flip = rowW(b.y1 - Math.floor(bh/3), b.y1 + 1) > rowW(b.y0, b.y0 + Math.floor(bh/3));
+  const out = canvasOf(bw, bh), ox = out.getContext('2d');
+  if (flip) { ox.translate(bw, bh); ox.rotate(Math.PI); }
+  ox.drawImage(big, b.x0, b.y0, bw, bh, 0, 0, bw, bh);
+  return fit360(out);
+}
+async function cutout(photo) {
+  try {
+    const m = await loadBG();
+    const blob = await new Promise(r => photo.toBlob(r, 'image/jpeg', .9));
+    const png = await m.removeBackground(blob, BG_CFG);
+    const bmp = await createImageBitmap(png), c = canvasOf(bmp.width, bmp.height);
+    c.getContext('2d').drawImage(bmp, 0, 0);
+    return orientCut(c) || ellipseCut(photo);
+  } catch (e) { console.warn('누끼 실패', e); return ellipseCut(photo); }
+}
+
+async function init() {
+  soles = D.map((d, i) => { const img = new Image(); img.src = `s/${String(d.no).padStart(3,'0')}.webp`; return {d, img, i}; });
+  resize();
+  await Promise.all(soles.map(o => o.img.decode().catch(() => {})));
+  drawGrid();
+  if (Q.has('demo') || Q.has('t')) {
+    const im = new Image(); im.src = 's/demo.jpg'; await im.decode().catch(() => {});
+    const photo = shrink(im, 1024);
+    if (Q.has('cuttest')) { const c = await cutout(photo); clear(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(c, 20, 20); document.title = 'cut ' + c.width + 'x' + c.height; return; }
+    start(Q.has('t') ? Promise.resolve(ellipseCut(photo)) : cutout(photo), photo);
+  }
+}
+
+// 쏟아짐 → 쌓임(내 신바닥도 섞여 묻힘) → 닳은 순서로 다시 격자 → 내 신바닥만 남았다가 101번째 칸
+function start(mePromise, photo) {
+  busy = true; cam.classList.add('hide');
+  me = null; let meImg = null; mePromise.then(c => { meImg = c; });
+  const engine = Engine.create({enableSleeping: true}); engine.gravity.y = 1.3;
+  const wall = 300, opt = {isStatic: true};
+  Composite.add(engine.world, [
+    Bodies.rectangle(W/2, H + wall/2, W*3, wall, opt),
+    Bodies.rectangle(-wall/2, -H, wall, H*5, opt),
+    Bodies.rectangle(W + wall/2, -H, wall, H*5, opt)]);
+  const order = soles.map((_, i) => i).sort(() => Math.random() - .5);   // 쏟아지는 순서는 뒤죽박죽
+  order.forEach((i, n) => { soles[i].spawn = POUR + n*GAP; soles[i].b = null; });
+  const fallen = [];            // 떨어진 순서 = 그리는 순서 (나중 것이 위)
+  let sim = 0, sort = Infinity, end = Infinity, meGo = Infinity, frozen = false;
+
+  function drop(o, x) {
+    o.b = Bodies.rectangle(x, -o.ph*.6, o.pw*.8, o.ph*.88, {friction: .6, restitution: .12, density: .002});
+    Body.setAngle(o.b, (Math.random() - .5)*1.2);
+    Body.setVelocity(o.b, {x: (Math.random() - .5)*5, y: 6 + Math.random()*4});
+    Body.setAngularVelocity(o.b, (Math.random() - .5)*.3);
+    Composite.add(engine.world, o.b); fallen.push(o);
+  }
+  function physicsTo(t) {
+    while (sim + DT <= Math.min(t, sort)) {
+      sim += DT;
+      for (const o of soles) if (!o.b && sim >= o.spawn) drop(o, W*(.15 + Math.random()*.7));
+      // 내 신바닥: 준비되면 가운데쯤으로 떨어뜨림. 너무 오래 걸리면 타원으로 자른 사진으로
+      if (!me && sim >= ME_AT && (meImg || sim > WAIT_MAX)) {
+        me = {img: meImg || ellipseCut(photo), i: 100};
+        size(me, me.img.width, me.img.height, 100); drop(me, W*(.35 + Math.random()*.3));
+        sort = Math.max(SORT_MIN, sim + 1600); meGo = sort + 99*STAG + MOVE - 300; end = meGo + ME_DUR;
+      }
+      Engine.update(engine, DT);
+    }
+    if (t >= sort && !frozen) {          // 더미 모양을 저장하고 물리 끝
+      frozen = true;
+      for (const o of fallen) { o.px = o.b.position.x; o.py = o.b.position.y; o.pa = norm(o.b.angle); }
+    }
+  }
+
+  function render(t) {
+    physicsTo(t); clear();
+    if (t < sort) {
+      for (const o of soles) if (!o.b) {          // 격자 → 위로 빠져나감
+        const g = grid(o.i), u = easeIn((t - o.i*3) / LIFT);
+        draw(o, g.x, lerp(g.y, -o.ph, u), 0, lerp(o.f, 1, u));
+      }
+      for (const o of fallen) draw(o, o.b.position.x, o.b.position.y, o.b.angle, 1);   // 쏟아지고 쌓임
+    } else {
+      const u = ease((t - meGo) / ME_DUR), g = grid(100);
+      if (t < meGo) draw(me, me.px, me.py, me.pa, 1);       // 다른 신바닥이 빠져나가는 동안 더미 자리에 남음
+      for (const o of soles) {                    // 닳은 순서대로 제자리
+        const gi = grid(o.i), v = ease((t - sort - o.i*STAG) / MOVE);
+        draw(o, lerp(o.px, gi.x, v), lerp(o.py, gi.y, v), lerp(o.pa, 0, v), lerp(1, o.f, v));
+      }
+      if (t >= meGo) draw(me, lerp(me.px, g.x, u), lerp(me.py, g.y, u), lerp(me.pa, 0, u), lerp(1, me.f, u));
+    }
+  }
+
+  if (Q.has('t')) { mePromise.then(() => setTimeout(() => render(+Q.get('t')), 0)); return; }
+  // 휴대폰이 느려도 한 번에 너무 많이 계산하지 않게, 한 프레임에 최대 34ms만 진행
+  let t = 0, last = performance.now();
+  (function loop(now) {
+    t = Math.min(end, t + Math.min(34, Math.max(0, now - last))); last = now;
+    render(t);
+    if (t < end) requestAnimationFrame(loop);
+    else { busy = false; me.done = true; cam.classList.remove('hide'); drawGrid(); }
+  })(last);
+}
+
+cam.onclick = () => { if (busy) return; loadBG(); file.click(); };
+file.onchange = () => {
+  const f = file.files[0]; if (!f) return;
+  const im = new Image();
+  im.onload = () => { const photo = shrink(im, 1024); URL.revokeObjectURL(im.src); start(cutout(photo), photo); };
+  im.src = URL.createObjectURL(f); file.value = '';
+};
+addEventListener('resize', () => { if (!busy) { resize(); drawGrid(); } });
+init();
+</script>
+
+</body>
+</html>
