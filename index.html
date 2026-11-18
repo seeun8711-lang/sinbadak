@@ -9,7 +9,12 @@
 html,body{height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
 :root{--bg:#F7F7F7;--btn:#111;--btnfg:#fff}
 body.dark{--bg:#141414;--btn:#F2F2F2;--btnfg:#111}
-#cv{position:fixed;left:0;top:0;touch-action:none}
+#cv{position:fixed;left:0;top:0;touch-action:none;pointer-events:none}
+#gd{position:fixed;left:0;top:0;right:0;bottom:0}
+#gd img,#gd i{position:absolute;display:block}
+#gd i{border:1.5px dashed #BDBDBD;border-radius:2px}
+body.dark #gd i{border-color:#555}
+#dbg{position:fixed;left:4px;top:4px;font:11px monospace;color:#c00;display:none}
 #cam{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));width:68px;height:68px;margin-left:-34px;border-radius:50%;border:0;background:var(--btn);display:flex;align-items:center;justify-content:center;transition:opacity .4s,transform .2s}
 #cam:active{transform:scale(.92)}
 #cam.hide{opacity:0;pointer-events:none}
@@ -24,7 +29,9 @@ body.dark{--bg:#141414;--btn:#F2F2F2;--btnfg:#111}
 </style>
 </head>
 <body>
+<div id="gd"></div>
 <canvas id="cv"></canvas>
+<div id="dbg"></div>
 <div id="load"><div class="ph"><img alt=""><i></i></div></div>
 <button id="cam" aria-label="내 신바닥 찍어 올리기"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13.2" r="3.6"/></svg></button>
 <input id="file" type="file" accept="image/*" capture="environment">
@@ -96,11 +103,16 @@ function drawSlot() {
   ctx.strokeStyle = DARK ? '#555' : '#BDBDBD'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
   ctx.beginPath(); ctx.rect(g.x - w/2, g.y - h/2, w, h); ctx.stroke(); ctx.setLineDash([]);
 }
+// 멈춰 있는 격자는 일반 이미지로 (휴대폰 브라우저가 화면 해상도에 맞춰 선명하게 줄여 줌). 그림판은 움직일 때만
+const gd = document.getElementById('gd');
+function put(el, g, w, h) { Object.assign(el.style, {left: g.x - w/2 + 'px', top: g.y - h/2 + 'px', width: w + 'px', height: h + 'px'}); gd.appendChild(el); }
 function drawGrid() {
-  clear();
-  soles.forEach(o => { const g = grid(o.i); draw(o, g.x, g.y, 0, o.f); });
+  clear(); gd.textContent = ''; gd.style.display = '';
+  soles.forEach(o => { const im = new Image(); im.src = o.img.src; im.alt = ''; put(im, grid(o.i), o.pw*o.f, o.ph*o.f); });
   const g = grid(NS);
-  if (me && me.done) draw(me, g.x, g.y, 0, me.f); else drawSlot();
+  if (me && me.done) { if (!me.url) me.url = me.img.toDataURL('image/png'); const im = new Image(); im.src = me.url; put(im, g, me.pw*me.f, me.ph*me.f); }
+  else put(document.createElement('i'), g, g.c*.84, g.c*.9);
+  if (Q.has('dbg')) { const d = document.getElementById('dbg'); d.style.display = 'block'; d.textContent = `v4 dpr ${devicePixelRatio} W ${W} H ${H} cv ${cv.width}x${cv.height}`; }
 }
 
 // ---- 내 사진 → 누끼 → 앞꿈치 위로 세우기 ----
@@ -206,7 +218,7 @@ async function init() {
 
 // 쏟아짐 → 아래부터 차곡차곡 쌓임(내 신바닥도 사이에 섞임) → 닳은 순서로 다시 격자 → 내 신바닥만 남았다가 다음 칸
 function start(meCanvas) {
-  busy = true; cam.classList.add('hide');
+  busy = true; cam.classList.add('hide'); gd.style.display = 'none';
   me = {img: meCanvas, i: NS}; size(me, meCanvas.width, meCanvas.height, NS);
   // 쌓는 순서: 100장(+승인된 것)은 뒤섞고, 내 신바닥은 60% 지점에 끼워 위로 몇 줄 더 덮이게
   const order = soles.slice().sort(() => Math.random() - .5);
