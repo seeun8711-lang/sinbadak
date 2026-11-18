@@ -69,10 +69,26 @@ function size(o, w, h, i) { o.pw = w*K; o.ph = h*K; o.f = grid(i).c*.9 / Math.ma
 
 // 그리기: 한 장의 캔버스에 전부
 function clear() { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); }
+// 작게 그릴 때 뭉개지지 않게: 반씩 줄인 판을 미리 만들어 두고, 화면 크기에 가장 가까운 판으로 그림
+function mips(img) {
+  const out = []; let src = img, w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  while (Math.max(w, h) > 40) {
+    w = Math.max(1, Math.round(w/2)); h = Math.max(1, Math.round(h/2));
+    const c = canvasOf(w, h), x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, w, h);
+    out.unshift(c); src = c;
+  }
+  return out;   // 작은 것부터
+}
+function pick(o, px) {
+  if (!o.mips) o.mips = mips(o.img);
+  for (const c of o.mips) if (Math.max(c.width, c.height) >= px) return c;
+  return o.img;
+}
 function draw(o, x, y, a, sc) {
   const c = Math.cos(a)*sc*DPR, s = Math.sin(a)*sc*DPR;
   ctx.setTransform(c, s, -s, c, x*DPR, y*DPR);
-  ctx.imageSmoothingQuality = 'high'; ctx.drawImage(o.img, -o.pw/2, -o.ph/2, o.pw, o.ph);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(pick(o, Math.max(o.pw, o.ph)*sc*DPR), -o.pw/2, -o.ph/2, o.pw, o.ph);
 }
 function drawSlot() {
   const g = grid(NS), w = g.c*.84, h = g.c*.9;
@@ -174,6 +190,7 @@ async function init() {
   NS = soles.length;
   resize();
   await Promise.all(soles.map(o => o.img.decode().catch(() => {})));
+  soles.forEach(o => { if (o.img.naturalWidth) o.mips = mips(o.img); });
   drawGrid();
   if (Q.has('demo') || Q.has('t')) {
     const im = new Image(); im.src = 's/demo.jpg'; await im.decode().catch(() => {});
