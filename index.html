@@ -15,32 +15,36 @@ body.dark{--bg:#141414;--btn:#F2F2F2;--btnfg:#111}
 #cam.hide{opacity:0;pointer-events:none}
 #cam svg{width:30px;height:30px;stroke:var(--btnfg);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #file{display:none}
+#load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);opacity:0;pointer-events:none;transition:opacity .3s}
+#load.on{opacity:1}
+#load .ph{position:relative;width:46vw;max-width:220px;aspect-ratio:1/1.9;border-radius:50%/30%;overflow:hidden;background:#ddd}
+#load img{width:100%;height:100%;object-fit:cover;filter:saturate(.6) brightness(1.05)}
+#load i{position:absolute;left:-10%;right:-10%;height:18%;top:-20%;background:linear-gradient(to bottom,transparent,rgba(255,255,255,.85),transparent);animation:scan 1.3s ease-in-out infinite}
+@keyframes scan{0%{transform:translateY(0)}100%{transform:translateY(700%)}}
 </style>
 </head>
 <body>
 <canvas id="cv"></canvas>
+<div id="load"><div class="ph"><img alt=""><i></i></div></div>
 <button id="cam" aria-label="내 신바닥 찍어 올리기"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13.2" r="3.6"/></svg></button>
 <input id="file" type="file" accept="image/*" capture="environment">
-<script src="matter.min.js"></script>
 <script>
 const Q = new URLSearchParams(location.search);
 if (Q.has('dark')) document.body.classList.add('dark');
 if (Q.has('nocam')) document.getElementById('cam').style.display = 'none';   // 예시 화면 캡처용
 const DARK = Q.has('dark');
-const {Engine, Bodies, Composite, Body} = Matter;
-const cv = document.getElementById('cv'), ctx = cv.getContext('2d'),
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d'), load = document.getElementById('load'),
       cam = document.getElementById('cam'), file = document.getElementById('file');
 const D = [{"no":1,"w":149,"h":360},{"no":2,"w":147,"h":360},{"no":3,"w":211,"h":360},{"no":4,"w":157,"h":360},{"no":5,"w":174,"h":360},{"no":6,"w":148,"h":360},{"no":7,"w":143,"h":360},{"no":8,"w":183,"h":360},{"no":9,"w":140,"h":360},{"no":10,"w":163,"h":360},{"no":11,"w":144,"h":360},{"no":12,"w":161,"h":360},{"no":13,"w":143,"h":360},{"no":14,"w":174,"h":360},{"no":15,"w":140,"h":360},{"no":16,"w":135,"h":360},{"no":17,"w":144,"h":360},{"no":18,"w":148,"h":360},{"no":19,"w":123,"h":360},{"no":20,"w":136,"h":360},{"no":21,"w":159,"h":360},{"no":22,"w":145,"h":360},{"no":23,"w":161,"h":360},{"no":24,"w":137,"h":360},{"no":25,"w":122,"h":359},{"no":26,"w":136,"h":360},{"no":27,"w":219,"h":360},{"no":28,"w":144,"h":360},{"no":29,"w":134,"h":360},{"no":30,"w":140,"h":360},{"no":31,"w":176,"h":360},{"no":32,"w":160,"h":360},{"no":33,"w":155,"h":360},{"no":34,"w":161,"h":360},{"no":35,"w":141,"h":360},{"no":36,"w":167,"h":359},{"no":37,"w":138,"h":360},{"no":38,"w":169,"h":360},{"no":39,"w":178,"h":360},{"no":40,"w":117,"h":360},{"no":41,"w":123,"h":360},{"no":42,"w":200,"h":360},{"no":43,"w":165,"h":360},{"no":44,"w":147,"h":360},{"no":45,"w":148,"h":359},{"no":46,"w":158,"h":360},{"no":47,"w":144,"h":360},{"no":48,"w":140,"h":360},{"no":49,"w":147,"h":360},{"no":50,"w":156,"h":360},{"no":51,"w":126,"h":360},{"no":52,"w":141,"h":360},{"no":53,"w":156,"h":360},{"no":54,"w":132,"h":360},{"no":55,"w":159,"h":360},{"no":56,"w":163,"h":360},{"no":57,"w":131,"h":360},{"no":58,"w":127,"h":360},{"no":59,"w":151,"h":360},{"no":60,"w":170,"h":360},{"no":61,"w":146,"h":360},{"no":62,"w":190,"h":360},{"no":63,"w":150,"h":360},{"no":64,"w":122,"h":360},{"no":65,"w":136,"h":360},{"no":66,"w":180,"h":360},{"no":67,"w":145,"h":360},{"no":68,"w":141,"h":360},{"no":69,"w":165,"h":360},{"no":70,"w":127,"h":360},{"no":71,"w":137,"h":360},{"no":72,"w":139,"h":360},{"no":73,"w":128,"h":360},{"no":74,"w":136,"h":359},{"no":75,"w":129,"h":360},{"no":76,"w":134,"h":360},{"no":77,"w":127,"h":360},{"no":78,"w":142,"h":360},{"no":79,"w":155,"h":360},{"no":80,"w":156,"h":360},{"no":81,"w":131,"h":360},{"no":82,"w":132,"h":360},{"no":83,"w":211,"h":360},{"no":84,"w":135,"h":360},{"no":85,"w":164,"h":360},{"no":86,"w":127,"h":360},{"no":87,"w":128,"h":360},{"no":88,"w":173,"h":360},{"no":89,"w":138,"h":360},{"no":90,"w":167,"h":360},{"no":91,"w":173,"h":360},{"no":92,"w":181,"h":360},{"no":93,"w":124,"h":360},{"no":94,"w":126,"h":360},{"no":95,"w":128,"h":360},{"no":96,"w":160,"h":360},{"no":97,"w":127,"h":360},{"no":98,"w":141,"h":360},{"no":99,"w":135,"h":360},{"no":100,"w":139,"h":360}];  // 신바닥 100장 크기 (닳은 순서)
 let W, H, DPR, K, soles = [], grid, busy = false, me = null, NS = 100;   // NS: 줄에 놓인 신바닥 수 (100 + 승인된 관객 신바닥)
 // 서버 (Supabase, 세은님 개인 계정). 공개 키라 화면 코드에 있어도 됨. 관객 신바닥은 승인한 것만 내려받음
 const SB = 'https://twszscgkcikjwxrgzwst.supabase.co', SBK = 'sb_publishable_YlZ5qk9rX06PbsGNXhhEiA_YgNytE6X';
 
-// 시간표 (ms). 내 신바닥이 늦게 준비되면 뒤 시간들이 그만큼 밀린다
+// 시간표 (ms)
 const LIFT = 450,                 // 격자에서 위로 빠져나감
-      POUR = 500, GAP = 22,       // 위에서 한 장씩 쏟아짐
-      ME_AT = POUR + 60*GAP,      // 내 신바닥은 60번째쯤 섞여 떨어져 나머지 40장에 묻힘
-      SORT_MIN = POUR + 100*GAP + 900,
-      STAG = 14, MOVE = 900, ME_DUR = 1100, WAIT_MAX = 25000, DT = 1000/60;
+      POUR = 500, GAP = 22,       // 위에서 한 장씩 떨어짐
+      FALL = 420,                 // 한 장이 떨어지는 시간
+      STAG = 14, MOVE = 900, ME_DUR = 1100;
 
 const ease = u => 1 - Math.pow(1 - Math.min(1, Math.max(0, u)), 3);
 const easeIn = u => Math.pow(Math.min(1, Math.max(0, u)), 2);
@@ -50,7 +54,7 @@ const norm = a => { a %= Math.PI*2; if (a > Math.PI) a -= Math.PI*2; if (a < -Ma
 // 화면 크기와 10열 격자 (100장 + 101번째 칸)
 function resize() {
   W = Q.has('phone') ? 390 : innerWidth; H = Q.has('phone') ? 844 : innerHeight;
-  DPR = Math.min(2, devicePixelRatio || 1);
+  DPR = Math.min(3, devicePixelRatio || 1);
   cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
   cv.style.width = W + 'px'; cv.style.height = H + 'px';
   const pad = 18, cols = 10, rows = Math.ceil((NS + 1) / cols), cell = Math.min((W - pad*2) / cols, (H - 140 - pad) / rows);
@@ -68,7 +72,7 @@ function clear() { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.wi
 function draw(o, x, y, a, sc) {
   const c = Math.cos(a)*sc*DPR, s = Math.sin(a)*sc*DPR;
   ctx.setTransform(c, s, -s, c, x*DPR, y*DPR);
-  ctx.drawImage(o.img, -o.pw/2, -o.ph/2, o.pw, o.ph);
+  ctx.imageSmoothingQuality = 'high'; ctx.drawImage(o.img, -o.pw/2, -o.ph/2, o.pw, o.ph);
 }
 function drawSlot() {
   const g = grid(NS), w = g.c*.84, h = g.c*.9;
@@ -96,7 +100,7 @@ function shrink(img, max) {   // 휴대폰 원본(수천 px)을 한 번만 줄�
   const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, r = Math.min(1, max / Math.max(iw, ih));
   const c = canvasOf(iw*r, ih*r); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c;
 }
-function fit360(c) { const r = 360 / Math.max(c.width, c.height), o = canvasOf(c.width*r, c.height*r); o.getContext('2d').drawImage(c, 0, 0, o.width, o.height); return o; }
+function fit360(c) { const r = 720 / Math.max(c.width, c.height), o = canvasOf(c.width*r, c.height*r); o.getContext('2d').drawImage(c, 0, 0, o.width, o.height); return o; }
 function ellipseCut(photo) {   // 누끼가 안 될 때: 신바닥 모양 타원으로 자름
   const w = 190, h = 360, c = canvasOf(w, h), x = c.getContext('2d');
   x.beginPath(); x.ellipse(w/2, h/2, w/2, h/2, 0, 0, Math.PI*2); x.clip();
@@ -178,87 +182,81 @@ async function init() {
     if (Q.has('t')) {
       let c = ellipseCut(photo);
       if (Q.get('me') === 'cut') { const ci = new Image(); ci.src = 's/demo_cut.png'; await ci.decode().catch(() => {}); c = fit360(shrink(ci, 2000)); }
-      start(c, photo);
-    } else start(cutout(photo), photo);
+      start(c);
+    } else go(photo);
   }
 }
 
-// 쏟아짐 → 쌓임(내 신바닥도 섞여 묻힘) → 닳은 순서로 다시 격자 → 내 신바닥만 남았다가 101번째 칸
-function start(mePromise, photo) {
+// 쏟아짐 → 아래부터 차곡차곡 쌓임(내 신바닥도 사이에 섞임) → 닳은 순서로 다시 격자 → 내 신바닥만 남았다가 다음 칸
+function start(meCanvas) {
   busy = true; cam.classList.add('hide');
-  me = null; let meImg = mePromise instanceof HTMLCanvasElement ? mePromise : null;
-  if (!meImg) mePromise.then(c => { meImg = c; });
-  const engine = Engine.create({enableSleeping: true}); engine.gravity.y = 1.3;
-  const wall = 300, opt = {isStatic: true};
-  Composite.add(engine.world, [
-    Bodies.rectangle(W/2, H + wall/2, W*3, wall, opt),
-    Bodies.rectangle(-wall/2, -H, wall, H*5, opt),
-    Bodies.rectangle(W + wall/2, -H, wall, H*5, opt)]);
-  const order = soles.map((_, i) => i).sort(() => Math.random() - .5);   // 쏟아지는 순서는 뒤죽박죽
-  order.forEach((i, n) => { soles[i].spawn = POUR + n*GAP; soles[i].b = null; });
-  const fallen = [];            // 떨어진 순서 = 그리는 순서 (나중 것이 위)
-  let sim = 0, sort = Infinity, end = Infinity, meGo = Infinity, frozen = false;
+  me = {img: meCanvas, i: NS}; size(me, meCanvas.width, meCanvas.height, NS);
+  // 쌓는 순서: 100장(+승인된 것)은 뒤섞고, 내 신바닥은 60% 지점에 끼워 위로 몇 줄 더 덮이게
+  const order = soles.slice().sort(() => Math.random() - .5);
+  order.splice(Math.floor(order.length*.6), 0, me);
+  const cols = 8, rows = Math.ceil(order.length / cols), cw = W / cols;
+  const step = Math.min(cw*.9, (H*.5) / rows), hh = Math.min(step/.45, cw*2.2);   // 줄 간격, 쌓일 때 높이
+  order.forEach((o, n) => {
+    const r = Math.floor(n / cols), c = r % 2 ? cols - 1 - n % cols : n % cols;      // 지그재그로 한 줄씩
+    o.sx = cw*(c + .5) + (Math.random() - .5)*cw*.25;
+    o.sy = H - 26 - hh/2 - r*step;
+    o.sa = (Math.random() - .5)*.12;
+    o.ss = hh / o.ph;                                   // 모두 같은 높이로
+    o.t0 = POUR + n*GAP;
+  });
+  const SORT = POUR + order.length*GAP + FALL + 700, meGo = SORT + (NS - 1)*STAG + MOVE - 300, END = meGo + ME_DUR;
 
-  function drop(o, x) {
-    o.b = Bodies.rectangle(x, -o.ph*.6, o.pw*.8, o.ph*.88, {friction: .6, restitution: .12, density: .002});
-    Body.setAngle(o.b, (Math.random() - .5)*1.2);
-    Body.setVelocity(o.b, {x: (Math.random() - .5)*5, y: 6 + Math.random()*4});
-    Body.setAngularVelocity(o.b, (Math.random() - .5)*.3);
-    Composite.add(engine.world, o.b); fallen.push(o);
+  function fallY(o, t) {          // 위에서 떨어져 제자리에 닿고 살짝 튐
+    const u = (t - o.t0) / FALL;
+    if (u < 1) return lerp(-o.ph*o.ss, o.sy, u*u);
+    const b = Math.min(1, (t - o.t0 - FALL) / 160); return o.sy - Math.sin(Math.PI*b)*5*(1 - b);
   }
-  function physicsTo(t) {
-    while (sim + DT <= Math.min(t, sort)) {
-      sim += DT;
-      for (const o of soles) if (!o.b && sim >= o.spawn) drop(o, W*(.15 + Math.random()*.7));
-      // 내 신바닥: 준비되면 가운데쯤으로 떨어뜨림. 너무 오래 걸리면 타원으로 자른 사진으로
-      if (!me && sim >= ME_AT && (meImg || sim > WAIT_MAX)) {
-        me = {img: meImg || ellipseCut(photo), i: NS};
-        size(me, me.img.width, me.img.height, NS); drop(me, W*(.35 + Math.random()*.3));
-        sort = Math.max(SORT_MIN, sim + 1600); meGo = sort + 99*STAG + MOVE - 300; end = meGo + ME_DUR;
-      }
-      Engine.update(engine, DT);
-    }
-    if (t >= sort && !frozen) {          // 더미 모양을 저장하고 물리 끝
-      frozen = true;
-      for (const o of fallen) { o.px = o.b.position.x; o.py = o.b.position.y; o.pa = norm(o.b.angle); }
-    }
-  }
-
   function render(t) {
-    physicsTo(t); clear();
-    if (t < sort) {
-      for (const o of soles) if (!o.b) {          // 격자 → 위로 빠져나감
+    clear();
+    if (t < SORT) {
+      for (const o of soles) if (t < o.t0) {          // 격자 → 위로 빠져나감
         const g = grid(o.i), u = easeIn((t - o.i*3) / LIFT);
         draw(o, g.x, lerp(g.y, -o.ph, u), 0, lerp(o.f, 1, u));
       }
-      for (const o of fallen) draw(o, o.b.position.x, o.b.position.y, o.b.angle, 1);   // 쏟아지고 쌓임
+      for (const o of order) if (t >= o.t0) draw(o, o.sx, fallY(o, t), o.sa, o.ss);   // 먼저 떨어진 것부터 아래에
     } else {
-      const u = ease((t - meGo) / ME_DUR), g = grid(NS);
-      if (t < meGo) draw(me, me.px, me.py, me.pa, 1);       // 다른 신바닥이 빠져나가는 동안 더미 자리에 남음
-      for (const o of soles) {                    // 닳은 순서대로 제자리
-        const gi = grid(o.i), v = ease((t - sort - o.i*STAG) / MOVE);
-        draw(o, lerp(o.px, gi.x, v), lerp(o.py, gi.y, v), lerp(o.pa, 0, v), lerp(1, o.f, v));
+      if (t < meGo) draw(me, me.sx, me.sy, me.sa, me.ss);       // 다른 신바닥이 빠져나가는 동안 그 자리에 남음
+      for (const o of soles) {                                   // 닳은 순서대로 제자리
+        const g = grid(o.i), v = ease((t - SORT - o.i*STAG) / MOVE);
+        draw(o, lerp(o.sx, g.x, v), lerp(o.sy, g.y, v), lerp(o.sa, 0, v), lerp(o.ss, o.f, v));
       }
-      if (t >= meGo) draw(me, lerp(me.px, g.x, u), lerp(me.py, g.y, u), lerp(me.pa, 0, u), lerp(1, me.f, u));
+      if (t >= meGo) { const g = grid(NS), u = ease((t - meGo) / ME_DUR);
+        draw(me, lerp(me.sx, g.x, u), lerp(me.sy, g.y, u), lerp(me.sa, 0, u), lerp(me.ss, me.f, u)); }
     }
   }
-
   if (Q.has('t')) { render(+Q.get('t')); return; }
-  // 휴대폰이 느려도 한 번에 너무 많이 계산하지 않게, 한 프레임에 최대 34ms만 진행
   let t = 0, last = performance.now();
   (function loop(now) {
-    t = Math.min(end, t + Math.min(34, Math.max(0, now - last))); last = now;
+    t = Math.min(END, t + Math.min(34, Math.max(0, now - last))); last = now;
     render(t);
-    if (t < end) requestAnimationFrame(loop);
+    if (t < END) requestAnimationFrame(loop);
     else { busy = false; me.done = true; cam.classList.remove('hide'); drawGrid(); if (me.img.cut && !Q.has('demo')) upload(me.img); }
   })(last);
+}
+
+// 로딩: 찍은 사진 위로 선이 훑고 지나감 (누끼 따는 동안). 글자 없음
+function showLoading(photo) {
+  const u = photo.toDataURL('image/jpeg', .8);
+  load.querySelector('img').src = u; load.classList.add('on');
+}
+function hideLoading() { load.classList.remove('on'); }
+async function go(photo) {
+  busy = true; cam.classList.add('hide'); showLoading(photo);
+  const c = await cutout(photo);
+  hideLoading(); await new Promise(r => setTimeout(r, 250));
+  start(c);
 }
 
 cam.onclick = () => { if (busy) return; loadBG(); file.click(); };
 file.onchange = () => {
   const f = file.files[0]; if (!f) return;
   const im = new Image();
-  im.onload = () => { const photo = shrink(im, 1024); URL.revokeObjectURL(im.src); start(cutout(photo), photo); };
+  im.onload = () => { const photo = shrink(im, 1024); URL.revokeObjectURL(im.src); go(photo); };
   im.src = URL.createObjectURL(f); file.value = '';
 };
 addEventListener('resize', () => { if (!busy) { resize(); drawGrid(); } });
